@@ -19,7 +19,7 @@
 #define TRANSPOSE_DOWN 2
 #define S1_VCC    8
 #define VOLUME    A8
-#define VOLUME_2  A1
+#define MODAL     A1
 #define S0        A2
 #define M0        A3
 #define S1        A4
@@ -56,11 +56,18 @@ short fretDefs[N_STR][N_FRET];
 int mod;
 int vol;
 int vol_1;
-int vol_2;
+int modal;
+int modal_buffer;
 int mod_1;
 int mod_2;
+int mod_2_init;
 int pre_vol;
 int pre_mod;
+
+
+int modal_array [2][7] =  {{0,2,4,5,7,9,11},
+                    {0,2,3,5,7,8,10}};
+
 
 short T_vals[N_STR];
 bool T_active[] = {false, false, false, false}; //is it currently active
@@ -186,7 +193,8 @@ void setup() {
   pinMode(VOLUME,INPUT);
   pinMode(M0,INPUT);
   pinMode(M1,INPUT);
-  //digitalWrite(S1_VCC, HIGH);
+  //digitalWrite(S1_VCC, HIGH);c
+  mod_2_init = analogRead(M1);
 }
 
 void loop() {
@@ -210,13 +218,18 @@ void readModulationAndVol(){
   mod_1 = analogRead(M0);
   mod_2 = analogRead(M1);
   vol_1 = analogRead(VOLUME);
-  vol_2 = analogRead(VOLUME_2);
-  mod_1 = map(mod_1, 750, 900, 0, 127);
-  mod_2 = map(mod_2, 750, 900, 0, 127);
+  modal_buffer = analogRead(MODAL);
+  modal_buffer = map(modal_buffer, 0, 800, 0, 2);
+  mod_2 = map(mod_2,mod_2_init,900,0,127);
+  mod_1 = map(mod_1, 0, 900, 0, 127);
   mod = max(mod_1,mod_2);
   vol_1 = map(vol_1, 0, 300, 0, 127);
-  vol_2 = map(vol_2, 0, 512, 0, 127);
-  vol = max(vol_1,vol_2);
+  vol = vol_1;
+
+  if(abs(modal_buffer != modal)){
+    modal = modal_buffer;
+    Serial.println(modal);
+  }
   
   if(abs(vol - pre_vol) > 5){
     Serial.println("vol");
@@ -229,9 +242,9 @@ void readModulationAndVol(){
   }
   if(abs(mod - pre_mod) > 5){
     Serial.println("mod");
-    if (mod < 20)
+    if (mod < 20 )
       controllerChange(1,0);
-    else
+    else if ( mod <= 127 )
       controllerChange(1,mod);
     pre_mod = mod;    
   }
@@ -292,6 +305,8 @@ void pickNotes(){
 void legatoTest(){
   for(int i=0; i<N_STR; i++){
     if(S_active[i]){
+
+
       int note = fretTouched[i] + offsets[i];
       if (note != S_active[i] && fretTouched[i] == -1){
         noteOff(0x80 + channel, S_active[i]);
@@ -335,37 +350,36 @@ void readControls(){
 void determineFrets () {
    //---------Get Fret Numbers------
  for (int i=0; i< N_STR; i++) {
- 
+   
    short s_val = S_vals[i];
-    
+   
     //check for open strings
-    if (s_val == 0 ) {
-      S_old[i] = s_val;
-      fretTouched[i]=-1;
-    }
-//    else if(s_val >= fretDefs[i][0] && abs((int)s_val-(int)S_old[i]) > S_PAD){
-//      S_old[i] = s_val;
-//      fretTouched[i] = 1;
-//    }
-    else{
-      //loop through the array of fret definitions
-      for (int j=1; j<N_FRET; j++) {
-        int k = j - 1;
-        if (s_val >= fretDefs[i][j] && 
-            s_val < fretDefs[i][k] &&
-            abs((int)s_val-(int)S_old[i]) > S_PAD) {
-              
-              S_old[i] = s_val;
-              fretTouched[i] = j - 1;
-
-            }
-      }
-    }
-               //Serial.println("fret");
-              // Serial.println(i);
-              //Serial.println(fretTouched[i]);
-              //Serial.println("");
+   if (s_val == 0 ) {
+    S_old[i] = s_val;
+    fretTouched[i]=-1;
   }
+
+  else{
+      //loop through the array of fret definitions
+    for (int j=1; j<N_FRET; j++) {
+      int k = j - 1;
+      if (s_val >= fretDefs[i][j] && 
+        s_val < fretDefs[i][k] &&
+      abs((int)s_val-(int)S_old[i]) > S_PAD) {
+        
+        S_old[i] = s_val;
+        fretTouched[i] = j - 1;
+        if(modal != 0) // not chromatic mode
+          fretTouched[i] = modal_array[modal-1][fretTouched[i]%7] + (fretTouched[i]/7) * 12;
+        Serial.println("fret");
+        Serial.println(i);
+        Serial.println(fretTouched[i]);
+        Serial.println("");
+       }
+     }
+   }
+ }
+
 }
 
 void readTrellis(){
