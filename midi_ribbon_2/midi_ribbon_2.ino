@@ -211,6 +211,8 @@ void readModulationAndVol(){
   vol = map(vol, 0, 300, 0, 127);
   if(abs(vol - pre_vol) > 5){
     Serial.println("vol");
+    if (vol >= 127)
+      vol = 127;
     controllerChange(7,vol);
     pre_vol = vol;
   }
