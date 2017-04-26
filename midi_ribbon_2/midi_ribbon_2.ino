@@ -19,6 +19,7 @@
 #define TRANSPOSE_DOWN 2
 #define S1_VCC    8
 #define VOLUME    A8
+#define VOLUME_2  A1
 #define S0        A2
 #define M0        A3
 #define S1        A4
@@ -54,6 +55,10 @@ short fretDefs[N_STR][N_FRET];
 
 int mod;
 int vol;
+int vol_1;
+int vol_2;
+int mod_1;
+int mod_2;
 int pre_vol;
 int pre_mod;
 
@@ -202,17 +207,23 @@ void loop() {
 }
 
 void readModulationAndVol(){
-  int mod_1 = analogRead(M0);
-  int mod_2 = analogRead(M1);
-  vol = analogRead(VOLUME);
-  mod_1 = map(mod_1, 700, 900, 0, 127);
-  mod_2 = map(mod_2, 700, 900, 0, 127);
+  mod_1 = analogRead(M0);
+  mod_2 = analogRead(M1);
+  vol_1 = analogRead(VOLUME);
+  vol_2 = analogRead(VOLUME_2);
+  mod_1 = map(mod_1, 750, 900, 0, 127);
+  mod_2 = map(mod_2, 750, 900, 0, 127);
   mod = max(mod_1,mod_2);
-  vol = map(vol, 0, 300, 0, 127);
+  vol_1 = map(vol_1, 0, 300, 0, 127);
+  vol_2 = map(vol_2, 0, 512, 0, 127);
+  vol = max(vol_1,vol_2);
+  
   if(abs(vol - pre_vol) > 5){
     Serial.println("vol");
     if (vol >= 127)
       vol = 127;
+    if (vol <= 5)
+      vol = 0;
     controllerChange(7,vol);
     pre_vol = vol;
   }
