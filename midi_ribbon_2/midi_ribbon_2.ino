@@ -43,7 +43,7 @@
 #define S_PAD     3
 #define T_PAD     300
 
-#define MOD_THRESHOLD 80
+#define MOD_THRESHOLD 20
 
 long noteDebounceTime = 0;
 int noteDebounceDelay = 25;
@@ -220,8 +220,8 @@ void readModulationAndVol(){
   vol_1 = analogRead(VOLUME);
   modal_buffer = analogRead(MODAL);
   modal_buffer = map(modal_buffer, 0, 800, 0, 2);
-  mod_2 = map(mod_2,mod_2_init,900,0,127);
-  mod_1 = map(mod_1, 0, 900, 0, 127);
+  mod_2 = map(mod_2,mod_2_init,mod_2_init+300,0,127);
+  mod_1 = map(mod_1, 500, 850, 0, 127);
   mod = max(mod_1,mod_2);
   vol_1 = map(vol_1, 0, 300, 0, 127);
   vol = vol_1;
@@ -231,18 +231,18 @@ void readModulationAndVol(){
     Serial.println(modal);
   }
   
-  if(abs(vol - pre_vol) > 5){
+  if(abs(vol - pre_vol) > 5 && vol <= 127){
     Serial.println("vol");
     if (vol >= 127)
       vol = 127;
-    if (vol <= 5)
+    if (vol <= 10)
       vol = 0;
     controllerChange(7,vol);
     pre_vol = vol;
   }
   if(abs(mod - pre_mod) > 5){
     Serial.println("mod");
-    if (mod < 20 )
+    if (mod < MOD_THRESHOLD )
       controllerChange(1,0);
     else if ( mod <= 127 )
       controllerChange(1,mod);
