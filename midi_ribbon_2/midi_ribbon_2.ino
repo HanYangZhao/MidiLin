@@ -65,13 +65,13 @@ int pre_vol;
 int pre_mod;
 
 
-int modal_array [7][7] =  {{0,2,4,5,7,9,11},   //ionian
+int modal_array [6][7] =  {{0,2,4,5,7,9,11},   //ionian
                            {0,2,3,5,7,9,10},   //dorian
-                           {0,1,4,5,7,8,10},   //phyrgian dominant
+                           {0,1,3,5,7,8,10},   //phyrgian
                            {0,2,4,6,7,9,11},   //lydian
                            {0,2,4,5,7,9,10},   //mxyolydian
-                           {0,2,3,5,7,8,10},    //aeolian
-                           {0,1,3,5,6,8,10}};
+                           {0,2,3,5,7,8,10}};    //aeolian
+                           //{0,1,3,5,6,8,10}};
 
 
 
@@ -225,7 +225,7 @@ void readModulationAndVol(){
   mod_2 = analogRead(M1);
   vol_1 = analogRead(VOLUME);
   modal_buffer = analogRead(MODAL);
-  modal_buffer = map(modal_buffer, 0, 800, 0, 2);
+  modal_buffer = map(modal_buffer, 0, 700, 0, 7);
   mod_2 = map(mod_2,mod_2_init,mod_2_init+300,0,127);
   mod_1 = map(mod_1, 500, 850, 0, 127);
   mod = max(mod_1,mod_2);
@@ -233,15 +233,17 @@ void readModulationAndVol(){
   vol = vol_1;
 
   if(abs(modal_buffer != modal)){
+    if(modal_buffer > 7)
+      modal_buffer = 7;
     modal = modal_buffer;
     Serial.println(modal);
   }
   
-  if(abs(vol - pre_vol) > 5 && vol <= 127){
+  if(abs(vol - pre_vol) > 1 && vol <= 127){
     Serial.println("vol");
     if (vol >= 127)
       vol = 127;
-    if (vol <= 10)
+    if (vol <= 1)
       vol = 0;
     controllerChange(7,vol);
     pre_vol = vol;
@@ -375,8 +377,25 @@ void determineFrets () {
         
         S_old[i] = s_val;
         fretTouched[i] = j - 1;
-        if(modal != 0) // not chromatic mode
-          fretTouched[i] = modal_array[modal-1][fretTouched[i]%7] + (fretTouched[i]/7) * 12;
+        if(modal < 7){
+          // not chromatic mode
+          if(i == 0) 
+            fretTouched[i] = modal_array[modal][fretTouched[i]%7] + (fretTouched[i]/7) * 12;
+          else if(i == 1)
+          {
+             if(modal == 3)
+              fretTouched[i] = (modal_array[(modal+3)%6][fretTouched[i]%7] + (fretTouched[i]/7) * 12) + 2; //fix for locrian
+             else if(modal > 3){
+              fretTouched[i] = (modal_array[(modal+2)%6][fretTouched[i]%7] + (fretTouched[i]/7) * 12);
+             }
+             else{
+              fretTouched[i] = modal_array[(modal+3)%6][fretTouched[i]%7] + (fretTouched[i]/7) * 12;
+             }
+          }
+
+        }
+         
+          
         Serial.println("fret");
         Serial.println(i);
         Serial.println(fretTouched[i]);
