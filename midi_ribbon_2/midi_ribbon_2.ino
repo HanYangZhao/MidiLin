@@ -65,8 +65,14 @@ int pre_vol;
 int pre_mod;
 
 
-int modal_array [2][7] =  {{0,2,4,5,7,9,11},
-                    {0,2,3,5,7,8,10}};
+int modal_array [7][7] =  {{0,2,4,5,7,9,11},   //ionian
+                           {0,2,3,5,7,9,10},   //dorian
+                           {0,1,4,5,7,8,10},   //phyrgian dominant
+                           {0,2,4,6,7,9,11},   //lydian
+                           {0,2,4,5,7,9,10},   //mxyolydian
+                           {0,2,3,5,7,8,10},    //aeolian
+                           {0,1,3,5,6,8,10}};
+
 
 
 short T_vals[N_STR];
