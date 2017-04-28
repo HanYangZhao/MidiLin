@@ -1,20 +1,23 @@
+
+
 /*
 * Arduino Ribbon Synth MIDI controller
 * ------------------------------------
 * ©2015 Dean Miller
+* Modified by hyz
 */
 
 #include <EEPROM.h>
 #include <Wire.h>
-#include "Adafruit_Trellis.h"
 #include <Adafruit_NeoPixel.h>
+#include <QuickStats.h>
 #ifdef __AVR__
   #include <avr/power.h>
 #endif
 
 #define PIN_LED   13
-#define NEO_PIN   11
-#define N_PIXELS  2
+#define NEO_PIN   21
+#define N_PIXELS  29
 #define TRANSPOSE_UP 4
 #define TRANSPOSE_DOWN 2
 #define S1_VCC    8
@@ -45,11 +48,23 @@
 
 #define MOD_THRESHOLD 20
 
+//---Midi CC----
+#define VOLUME_CC 7
+#define MOD_CC 1
+#define MIDI_CHANNEL 0
+#define VOLCA_VOLUME_CC 11
+#define VOLCA_MOD_CC 46
+#define VOLCA_MIDI_CHANNEL 10
+#define MUTE_CC 123 
+
 long noteDebounceTime = 0;
 int noteDebounceDelay = 25;
 
 long lastDebounceTime = 0;
 int debounceDelay = 200;
+
+long ledDebounceTime = 0;
+int ledDebounceDelay = 20;
 
 short fretDefs[N_STR][N_FRET];
 
@@ -61,9 +76,13 @@ int modal_buffer;
 int mod_1;
 int mod_2;
 int mod_2_init;
+int s_2_init;
 int pre_vol;
 int pre_mod;
-
+bool volca = false;
+int volume_cc = VOLUME_CC;
+int mod_cc = MOD_CC;
+int channel = MIDI_CHANNEL;
 
 int modal_array [6][7] =  {{0,2,4,5,7,9,11},   //ionian
                            {0,2,3,5,7,9,10},   //dorian
@@ -72,8 +91,6 @@ int modal_array [6][7] =  {{0,2,4,5,7,9,11},   //ionian
                            {0,2,4,5,7,9,10},   //mxyolydian
                            {0,2,3,5,7,8,10}};    //aeolian
                            //{0,1,3,5,6,8,10}};
-
-
 
 short T_vals[N_STR];
 bool T_active[] = {false, false, false, false}; //is it currently active
@@ -86,9 +103,6 @@ int S_active[N_STR];                            //currently active notes
 int S_pins[] = {S0,S1};
 int fretTouched[N_STR];
 
-bool lightsActive = false;
-
-bool transposed = false;
 bool modreset = true;
 
 //E A D G
@@ -100,9 +114,12 @@ int offsets_transposed[] = {35, 40, 45, 50};
 //default offsets
 int offsets[] = {40, 45, 50, 55};
 
-Adafruit_Trellis matrix0 = Adafruit_Trellis();
-Adafruit_TrellisSet trellis =  Adafruit_TrellisSet(&matrix0);
+
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(N_PIXELS, NEO_PIN, NEO_GRB + NEO_KHZ800);
+int led_number[2] = {0,0};
+int led_color;
+int led;
+int prev_led;
 
 bool stickActive = false;
 bool stickState = false;
@@ -110,43 +127,9 @@ bool btnState = false;
 int stickZeroX;
 int stickZeroY;
 
-int channel = 0;
-int channelButtons[] = {4, 5, 6, 7};
-
 unsigned long last_read;
 
-
-void edgeLightsBlue(int btn){
-  if (trellis.justPressed(btn)) {
-    edgeLight(0, 0, 255);
-  }
-}
-
-void edgeLightsRed(int btn){
-  if (trellis.justPressed(btn)) {
-    edgeLight(255, 0, 0);
-  }
-}
-
-//map out all the trellis button functions here
-void (*fns[]) (int i) = {
-  edgeLightsBlue,    //0
-  edgeLightsRed,     //1
-  unset,             //2
-  unset,             //3
-  unset,             //4
-  unset,             //5
-  unset,             //6
-  unset,             //7
-  unset,             //8
-  unset,             //9
-  unset,             //10
-  unset,             //11
-  unset,             //12
-  unset,             //13
-  unset,             //14
-  transpose,         //15
-};
+QuickStats stats;
 
 void setup() {
   
@@ -171,20 +154,9 @@ void setup() {
 
   pinMode(PIN_LED, OUTPUT);
 
-  trellis.begin(0x70);
-    // light up all the LEDs in order
-  for (uint8_t i=0; i<N_KEYS; i++) {
-    trellis.setLED(i);
-    trellis.writeDisplay();    
-    delay(50);
-  }
-  // then turn them off
-  for (uint8_t i=0; i<N_KEYS; i++) {
-    trellis.clrLED(i);
-    trellis.writeDisplay();    
-    delay(50);
-  }
   pixels.begin();
+  pixels.setBrightness(50);
+  pixels.show();
   //calibrate joystick
   stickZeroX = analogRead(JSX);
   stickZeroY = analogRead(JSY);
@@ -201,15 +173,11 @@ void setup() {
   pinMode(M1,INPUT);
   //digitalWrite(S1_VCC, HIGH);c
   mod_2_init = analogRead(M1);
+  s_2_init = analogRead(S1);;
 }
 
 void loop() {
-  //we can only read the trellis every 30ms which is ok
-  //if(millis() - last_read >= 30){
-  //  readTrellis();
-  //  last_read = millis();
-  //}
-  readTranspose();
+  readButtons();
   readModulationAndVol();
   readControls();
   determineFrets();
@@ -231,11 +199,17 @@ void readModulationAndVol(){
   mod = max(mod_1,mod_2);
   vol_1 = map(vol_1, 0, 300, 0, 127);
   vol = vol_1;
-
   if(abs(modal_buffer != modal)){
-    if(modal_buffer > 7)
-      modal_buffer = 7;
-    modal = modal_buffer;
+    if(modal_buffer > 7){
+      modal = 7;
+      modal_buffer = 7;      
+    }
+
+    else
+      modal = modal_buffer;
+    onLED(modal+1,0,255,0);
+    delay(500);
+    onLED(N_PIXELS,0,0,0);
     Serial.println(modal);
   }
   
@@ -245,7 +219,7 @@ void readModulationAndVol(){
       vol = 127;
     if (vol <= 1)
       vol = 0;
-    controllerChange(7,vol);
+    controllerChange(volume_cc,vol);
     pre_vol = vol;
   }
   if(abs(mod - pre_mod) > 5){
@@ -253,15 +227,12 @@ void readModulationAndVol(){
     if (mod < MOD_THRESHOLD )
       controllerChange(1,0);
     else if ( mod <= 127 )
-      controllerChange(1,mod);
+      controllerChange(mod_cc,mod);
     pre_mod = mod;    
   }
-
-
-  
 }
 
-void readTranspose(){
+void readButtons(){
   int up = digitalRead(TRANSPOSE_UP);
   int down = digitalRead(TRANSPOSE_DOWN);
   int clear_notes = digitalRead(3);
@@ -272,19 +243,33 @@ void readTranspose(){
       transpose(-2);
     else if (!up && !clear_notes)
       transpose(2);
-    else if(!up)
+    else if(!up && down)
       transpose(1);
-    else if(!down)
+    else if(!down && up)
       transpose(-1);
+    else if(!up && !down){
+      if(!volca){
+        volume_cc = VOLCA_VOLUME_CC;
+        mod_cc = VOLCA_MOD_CC;
+        channel = VOLCA_MIDI_CHANNEL;
+        volca = true;
+        Serial.println("volca");
+      }
+      else if (volca){
+        volume_cc = VOLUME_CC;
+        mod_cc = MOD_CC;
+        channel = MIDI_CHANNEL;
+        volca = false;
+        Serial.println("!volca");
+      }         
+    }
+  
     else if (!clear_notes){
-      controllerChange(120,0);
+      controllerChange(MUTE_CC,0);
     }
 
-      
     lastDebounceTime = millis();
-
   }
-  
 }
 
 
@@ -314,23 +299,58 @@ void legatoTest(){
   for(int i=0; i<N_STR; i++){
     if(S_active[i]){
 
-
       int note = fretTouched[i] + offsets[i];
       if (note != S_active[i] && fretTouched[i] == -1){
         noteOff(0x80 + channel, S_active[i]);
+        
         S_active[i] = note;
+        //clrLED();
         continue;
+        
       }
 
       if(note != S_active[i] && (fretTouched[i] || T_active[i])){
         Serial.println("legatonote");
         noteOn(0x90 + channel, note, 120);
         noteOff(0x80 + channel, S_active[i]);
-
         S_active[i] = note;
+
+        
+
       }
     }
   }
+
+  led = max(led_number[0],led_number[1]);
+  //Serial.println(led_number[0]);
+   //Serial.println(led_number[1]);
+  if (led == -1){
+    led = 0;
+    onLED(N_PIXELS,0,0,0);
+  }
+    
+  else{
+    led = led + 1;
+    led = map(led,0,N_FRET - 1,0,N_PIXELS);
+    led_color = map(led,0,30,0,255);
+    //Serial.println(led_number);
+    if((millis() - ledDebounceTime ) > ledDebounceDelay){
+      for(int i=0;i<led;i++){
+        //pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+        pixels.setPixelColor(i, Wheel(led_color));
+      }
+      for(int i=led;i<N_PIXELS;i++){
+        //pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+        pixels.setPixelColor(i, (pixels.Color(0, 0, 0)));
+      }
+      pixels.show();
+      ledDebounceTime = millis(); 
+      prev_led = led ;
+    }
+  }
+
+  
+    
 }
 
 void cleanUp(){
@@ -343,20 +363,20 @@ void cleanUp(){
 }
 
 void readControls(){
-  if((millis() - noteDebounceTime ) > noteDebounceDelay){
     //read the strings and the triggers
     for (int i=0; i<N_STR; i++){
       T_hit[i] = checkTriggered(i);
       //Serial.println(T_hit[i]);
-     S_vals[i] =  analogRead(S_pins[i]);
-      //Serial.println(S_vals[i]);
+       S_vals[i] = analogRead(S_pins[i]);
+        //Serial.println(S_vals[i]);
+       if(i == 1 && abs(S_vals[1] - s_2_init) < 2)
+         S_vals[1] = 0;
     }
-    noteDebounceTime = millis();
-  }
+
 }
 
 void determineFrets () {
-   //---------Get Fret Numbers------
+ //---------Get Fret Numbers------
  for (int i=0; i< N_STR; i++) {
    
    short s_val = S_vals[i];
@@ -365,6 +385,7 @@ void determineFrets () {
    if (s_val == 0 ) {
     S_old[i] = s_val;
     fretTouched[i]=-1;
+    led_number[i] = fretTouched[i];
   }
 
   else{
@@ -377,6 +398,7 @@ void determineFrets () {
         
         S_old[i] = s_val;
         fretTouched[i] = j - 1;
+        led_number[i] = fretTouched[i];
         if(modal < 7){
           // not chromatic mode
           if(i == 0) 
@@ -393,9 +415,7 @@ void determineFrets () {
              }
           }
 
-        }
-         
-          
+        }          
         Serial.println("fret");
         Serial.println(i);
         Serial.println(fretTouched[i]);
@@ -407,34 +427,12 @@ void determineFrets () {
 
 }
 
-void readTrellis(){
-  // If a button was just pressed or released...
-  if (trellis.readSwitches()) {
-    // go through every button
-    for (uint8_t i=0; i<N_KEYS; i++) {
-      fns[i](i);
-    }
-    // tell the trellis to set the LEDs we requested
-    trellis.writeDisplay();
-  }
-}
 
 void unset(int i){
   //this function doesn't even do anything!!
 }
 
-void light(int i){
-  //light up the button 
-  
-  // if it was pressed, turn it on
-  if (trellis.justPressed(i)) {
-    trellis.setLED(i);
-  } 
-  // if it was released, turn it off
-  if (trellis.justReleased(i)) {
-    trellis.clrLED(i);
-  }
-}
+
 
 void calibrate(){
   if (1) {
@@ -442,15 +440,15 @@ void calibrate(){
   Serial.println("calibrating...");
   for (int i=0; i<N_STR; i++) {
     //Flash the LED too indicate calibration
-    setLED(btn);
+    onLED(10,250,0,0);
     delay(100);
-    clrLED(btn);
+    clrLED();
+    onLED(10,250,0,0);
     delay(100);
-    setLED(btn);
+    clrLED();
+    onLED(10,250,0,0);
     delay(100);
-    clrLED(btn);
-    delay(100);
-    setLED(btn);
+    clrLED();
   
     short sensorMax = 0;
     short sensorMin = 1023;
@@ -471,7 +469,7 @@ void calibrate(){
 
 
                       //write to memory
-        clrLED(btn);
+        clrLED();
         int addr = j * sizeof(short) + (N_FRET*i*sizeof(short));
         Serial.print("Writing ");
         Serial.print(val);
@@ -485,7 +483,7 @@ void calibrate(){
 
         
         delay(100);
-        setLED(btn);
+        onLED(10,250,0,0);
       }
     for (int j=0; j<N_FRET; j++) {
       short v = EEPROMReadShort(j * sizeof(short) + (N_FRET*i*sizeof(short)));
@@ -493,7 +491,7 @@ void calibrate(){
     }
   }
   
-  clrLED(btn);
+  clrLED();
   }
 }
 
@@ -516,14 +514,19 @@ short EEPROMReadShort(int address){
       return ((two << 0) & 0xFF) + ((one << 8) & 0xFFFF);
 }
 
-void setLED(int i){
-  trellis.setLED(i);
-  trellis.writeDisplay();
+void onLED(int led,int red,int green, int blue){
+  for(int i=0;i<led;i++){
+    //pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+    pixels.setPixelColor(i, pixels.Color(red, green, blue));
+  }
+  pixels.show();
 }
 
-void clrLED(int i){
-  trellis.clrLED(i);
-  trellis.writeDisplay();
+void clrLED(){
+  for(int i=0;i<N_PIXELS;i++){
+    pixels.setPixelColor(i, pixels.Color(0,0,0)); // turn off
+  }
+  pixels.show();
 }
 
 //check if a trigger has been hit. Return 0 if not, the value of the trigger if it has
@@ -544,25 +547,6 @@ short checkTriggered(int i){
   }
   //Serial.println(ret);
   return ret;
-}
-
-
-
-void edgeLight(int red, int green, int blue){
-  lightsActive = !lightsActive;
-    if(lightsActive){
-      for(int i=0;i<N_PIXELS;i++){
-        // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
-        pixels.setPixelColor(i, pixels.Color(red, green, blue));
-   }
-   pixels.show();
-    }
-    else{
-      for(int i=0;i<N_PIXELS;i++){
-        pixels.setPixelColor(i, pixels.Color(0,0,0)); // turn off
-      }
-      pixels.show();
-    }
 }
 
 void transpose(int dir){
@@ -594,22 +578,6 @@ void transpose(int dir){
       break;   
   }
 }
-
-/*
-void channel1(int btn){
-  if (trellis.justPressed(btn)) {
-    
-  }
-}
-
-void setChannel(int c){
-   for(int i=0; i<sizeof(channelButtons)/sizeof(int); i++){
-    channel
-  }
-  channel = c;
-}
-*/
-
 
 void readJoystick(){
    if (digitalRead(JSSEL) == LOW) {
@@ -668,5 +636,21 @@ void controllerChange(int controller, int value) {
   Serial.write(byte(0xb2));
   Serial.write(byte(controller));
   Serial.write(byte(value));
+}
+
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return pixels.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return pixels.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
 
