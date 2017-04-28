@@ -68,14 +68,14 @@ int ledDebounceDelay = 20;
 
 short fretDefs[N_STR][N_FRET];
 
-int mod;
+int mod_final;
 int vol;
 int vol_1;
 int modal;
 int modal_buffer;
-int mod_1;
-int mod_2;
-int mod_2_init;
+int buffer_mod[2];
+int mod[2];
+int mod_init[2];
 int s_2_init;
 int pre_vol;
 int pre_mod;
@@ -172,7 +172,8 @@ void setup() {
   pinMode(M0,INPUT);
   pinMode(M1,INPUT);
   //digitalWrite(S1_VCC, HIGH);c
-  mod_2_init = analogRead(M1);
+  mod_init[0] = analogRead(M0);
+  mod_init[1] = analogRead(M1);
   s_2_init = analogRead(S1);;
 }
 
@@ -189,14 +190,14 @@ void loop() {
 }
 
 void readModulationAndVol(){
-  mod_1 = analogRead(M0);
-  mod_2 = analogRead(M1);
+  buffer_mod[0] = analogRead(M0);
+  buffer_mod[1] = analogRead(M1);
   vol_1 = analogRead(VOLUME);
   modal_buffer = analogRead(MODAL);
   modal_buffer = map(modal_buffer, 0, 700, 0, 7);
-  mod_2 = map(mod_2,mod_2_init,mod_2_init+300,0,127);
-  mod_1 = map(mod_1, 500, 850, 0, 127);
-  mod = max(mod_1,mod_2);
+  mod[1] = map(buffer_mod[1],mod_init[1],mod_init[1]+300,0,127);
+  mod[0] = map(buffer_mod[0], mod_init[0],mod_init[0]+300, 0, 127);
+  mod_final = max(mod[0],mod[1]);
   vol_1 = map(vol_1, 0, 300, 0, 127);
   vol = vol_1;
   if(abs(modal_buffer != modal)){
@@ -222,13 +223,14 @@ void readModulationAndVol(){
     controllerChange(volume_cc,vol);
     pre_vol = vol;
   }
-  if(abs(mod - pre_mod) > 5){
-    Serial.println("mod");
-    if (mod < MOD_THRESHOLD )
-      controllerChange(1,0);
-    else if ( mod <= 127 )
-      controllerChange(mod_cc,mod);
-    pre_mod = mod;    
+  if(abs(mod_final - pre_mod) > 5){
+   
+    if (mod_final < MOD_THRESHOLD )
+      controllerChange(mod_cc,0);
+    else if ( mod_final <= 127 )
+      controllerChange(mod_cc,mod_final);
+       Serial.println("mod");
+    pre_mod = mod_final;    
   }
 }
 
@@ -367,10 +369,15 @@ void readControls(){
     for (int i=0; i<N_STR; i++){
       T_hit[i] = checkTriggered(i);
       //Serial.println(T_hit[i]);
+      if(abs(buffer_mod[i]- mod_init[i] > 5)){
        S_vals[i] = analogRead(S_pins[i]);
         //Serial.println(S_vals[i]);
-       if(i == 1 && abs(S_vals[1] - s_2_init) < 2)
+       if(i == 1 && abs(S_vals[1] - s_2_init) < 5)
          S_vals[1] = 0;
+      }
+      else
+        S_vals[i] = 0;
+
     }
 
 }
@@ -633,7 +640,8 @@ void noteOff(int cmd, int pitch) {
 //Sends controller change to the specified controller
 void controllerChange(int controller, int value) {
   Serial.println("cc");
-  Serial.write(byte(0xb2));
+  int ch = 176 + channel;
+  Serial.write(byte(ch));
   Serial.write(byte(controller));
   Serial.write(byte(value));
 }
