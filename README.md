@@ -15,6 +15,10 @@ A ribbon midi controller using
 Inspired by : https://synthhacker.blogspot.ca/2016/03/diy-midi-ribbon-controller.html
 
 Code adapted from https://github.com/deanm1278/arduinoRibbonController/blob/master/synth_v3.ino
-![Complete](/3.jpg)
+
+Demo : https://youtu.be/UU3WkZmNJEc
+
+[![Demo](/3.jpg)](https://www.youtube.com/watch?v=https://youtu.be/UU3WkZmNJEc)
+
 ![Complete](/1.jpg)
 ![Closeup](/2.jpg)
