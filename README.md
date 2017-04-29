@@ -1,5 +1,7 @@
 # Arduino Midi Ribbon Controller
 
+[![Demo](/3.jpg)](https://www.youtube.com/watch?v=UU3WkZmNJEc)
+
 This project was inspired by Wintergatan's Modulin https://www.youtube.com/watch?v=MUdWeBYe3GY
 
 # Main components
@@ -37,7 +39,7 @@ LED reacts to finger position
 
 [Demo](https://youtu.be/UU3WkZmNJEc)
 
-[![Demo](/3.jpg)](https://www.youtube.com/watch?v=UU3WkZmNJEc)
+
 
 ![Complete](/1.jpg)
 ![Closeup](/2.jpg)
