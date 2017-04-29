@@ -46,7 +46,7 @@
 #define S_PAD     3
 #define T_PAD     300
 
-#define MOD_THRESHOLD 20
+#define MOD_THRESHOLD 50
 
 //---Midi CC----
 #define VOLUME_CC 7
@@ -76,7 +76,7 @@ int modal_buffer;
 int buffer_mod[2];
 int mod[2];
 int mod_init[2];
-int s_2_init;
+int s_init[2];
 int pre_vol;
 int pre_mod;
 bool volca = false;
@@ -174,7 +174,8 @@ void setup() {
   //digitalWrite(S1_VCC, HIGH);c
   mod_init[0] = analogRead(M0);
   mod_init[1] = analogRead(M1);
-  s_2_init = analogRead(S1);;
+  s_init[1] = analogRead(S1);
+  s_init[0] = analogRead(S0);
 }
 
 void loop() {
@@ -195,8 +196,8 @@ void readModulationAndVol(){
   vol_1 = analogRead(VOLUME);
   modal_buffer = analogRead(MODAL);
   modal_buffer = map(modal_buffer, 0, 700, 0, 7);
-  mod[1] = map(buffer_mod[1],mod_init[1],mod_init[1]+300,0,127);
-  mod[0] = map(buffer_mod[0], mod_init[0],mod_init[0]+300, 0, 127);
+  mod[1] = map(buffer_mod[1],mod_init[1],mod_init[1]+400,0,127);
+  mod[0] = map(buffer_mod[0], 500,500+300, 0, 127);
   mod_final = max(mod[0],mod[1]);
   vol_1 = map(vol_1, 0, 300, 0, 127);
   vol = vol_1;
@@ -341,13 +342,14 @@ void legatoTest(){
         //pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
         pixels.setPixelColor(i, Wheel(led_color));
       }
-      for(int i=led;i<N_PIXELS;i++){
-        //pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
-        pixels.setPixelColor(i, (pixels.Color(0, 0, 0)));
-      }
-      pixels.show();
-      ledDebounceTime = millis(); 
-      prev_led = led ;
+      if(prev_led > led)
+        for(int i=led;i<N_PIXELS;i++){
+          //pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+          pixels.setPixelColor(i, (pixels.Color(0, 0, 0)));
+        }
+        pixels.show();
+        ledDebounceTime = millis(); 
+        prev_led = led ;
     }
   }
 
@@ -369,14 +371,16 @@ void readControls(){
     for (int i=0; i<N_STR; i++){
       T_hit[i] = checkTriggered(i);
       //Serial.println(T_hit[i]);
-      if(abs(buffer_mod[i]- mod_init[i] > 5)){
+      //if(i == 1 && abs(buffer_mod[i] - mod_init[i] > 1)){
        S_vals[i] = analogRead(S_pins[i]);
         //Serial.println(S_vals[i]);
-       if(i == 1 && abs(S_vals[1] - s_2_init) < 5)
-         S_vals[1] = 0;
-      }
-      else
-        S_vals[i] = 0;
+       //if(abs(S_vals[i] - s_init[i]) < 5)
+         //S_vals[i] = 0;
+      //}
+//      else if(i == 0)
+//        S_vals[i] = analogRead(S_pins[i]);
+      //else
+        //S_vals[i] = 0;
 
     }
 
