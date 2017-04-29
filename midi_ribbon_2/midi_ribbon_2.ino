@@ -46,7 +46,7 @@
 #define S_PAD     3
 #define T_PAD     300
 
-#define MOD_THRESHOLD 50
+#define MOD_THRESHOLD 30
 
 //---Midi CC----
 #define VOLUME_CC 7
@@ -372,7 +372,12 @@ void readControls(){
       T_hit[i] = checkTriggered(i);
       //Serial.println(T_hit[i]);
       //if(i == 1 && abs(buffer_mod[i] - mod_init[i] > 1)){
-       S_vals[i] = analogRead(S_pins[i]);
+      float temp[3];
+      for (int k = 0 ; k < 3; k++){
+        temp[k] = analogRead(S_pins[i]);
+        delay(3);
+      }
+       S_vals[i] = stats.minimum(temp,3);
         //Serial.println(S_vals[i]);
        //if(abs(S_vals[i] - s_init[i]) < 5)
          //S_vals[i] = 0;
