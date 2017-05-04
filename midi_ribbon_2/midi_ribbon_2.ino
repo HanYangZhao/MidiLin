@@ -17,18 +17,17 @@
 
 #define PIN_LED   13
 #define NEO_PIN   21
-#define N_PIXELS  29
-#define TRANSPOSE_UP 4
-#define TRANSPOSE_DOWN 2
-#define S1_VCC    8
-#define VOLUME    A8
-#define MODAL     A1
-#define S0        A2
-#define M0        A3
-#define S1        A4
-#define M1        A5
+#define N_PIXELS  29      //# of LEDS
+#define TRANSPOSE_UP 4    //D4
+#define TRANSPOSE_DOWN 2  //D2
+#define VOLUME    A8      //Master volume
+#define MODAL     A1      //Switch between the 7 musical modes
+#define S0        A2      //String 0
+#define M0        A3      //Modulation 0
+#define S1        A4      //String 1
+#define M1        A5      //Modulation 1
 
-
+/*Here for legacy*/
 #define T0        A0
 #define T1        A0
 #define T2        A0
@@ -39,14 +38,14 @@
 
 #define JSSEL     7
 
+
 #define THRESH    600
 #define N_STR     2
 #define N_FRET    25
-#define N_KEYS    16
 #define S_PAD     3
 #define T_PAD     300
 
-#define MOD_THRESHOLD 30
+#define MOD_THRESHOLD 30  //Modulation is not send under this value
 
 //---Midi CC----
 #define VOLUME_CC 7
@@ -70,15 +69,15 @@ short fretDefs[N_STR][N_FRET];
 
 int mod_final;
 int vol;
-int vol_1;
+int vol_buffer;
 int modal;
 int modal_buffer;
 int buffer_mod[2];
 int mod[2];
-int mod_init[2];
-int s_init[2];
-int pre_vol;
-int pre_mod;
+int mod_init[2]; //initial values for modulation
+int s_init[2];   //intial values for string position
+int pre_vol;     //previous volume
+int pre_mod;     //previous modulation
 bool volca = false;
 int volume_cc = VOLUME_CC;
 int mod_cc = MOD_CC;
@@ -147,10 +146,10 @@ void setup() {
     pinMode(S_pins[i], INPUT);
   }
   
-  pinMode(JSX, INPUT);
-  pinMode(JSY, INPUT);
-  pinMode(JSSEL, INPUT);
-  digitalWrite(JSSEL, HIGH);
+  //pinMode(JSX, INPUT);
+  //pinMode(JSY, INPUT);
+  //pinMode(JSSEL, INPUT);
+  //digitalWrite(JSSEL, HIGH);
 
   pinMode(PIN_LED, OUTPUT);
 
@@ -161,17 +160,16 @@ void setup() {
   stickZeroX = analogRead(JSX);
   stickZeroY = analogRead(JSY);
 
+  //Uncomment for re-calibration. Should be done only once
   //calibrate();
 
   pinMode(TRANSPOSE_UP, INPUT_PULLUP);
   pinMode(TRANSPOSE_DOWN, INPUT_PULLUP);
   pinMode(A0,INPUT);
   pinMode(3,INPUT_PULLUP);
-  //pinMode(S1_VCC, OUTPUT);
   pinMode(VOLUME,INPUT);
   pinMode(M0,INPUT);
   pinMode(M1,INPUT);
-  //digitalWrite(S1_VCC, HIGH);c
   mod_init[0] = analogRead(M0);
   mod_init[1] = analogRead(M1);
   s_init[1] = analogRead(S1);
@@ -193,14 +191,13 @@ void loop() {
 void readModulationAndVol(){
   buffer_mod[0] = analogRead(M0);
   buffer_mod[1] = analogRead(M1);
-  vol_1 = analogRead(VOLUME);
+  vol_buffer = analogRead(VOLUME);
   modal_buffer = analogRead(MODAL);
   modal_buffer = map(modal_buffer, 0, 700, 0, 7);
   mod[1] = map(buffer_mod[1],mod_init[1],mod_init[1]+400,0,127);
   mod[0] = map(buffer_mod[0], 500,500+300, 0, 127);
   mod_final = max(mod[0],mod[1]);
-  vol_1 = map(vol_1, 0, 300, 0, 127);
-  vol = vol_1;
+  vol = map(vol_buffer, 0, 300, 0, 127);
   if(abs(modal_buffer != modal)){
     if(modal_buffer > 7){
       modal = 7;
@@ -314,7 +311,10 @@ void legatoTest(){
 
       if(note != S_active[i] && (fretTouched[i] || T_active[i])){
         Serial.println("legatonote");
-        noteOn(0x90 + channel, note, 120);
+        int volume = mod_final * 2;
+        if(volume > 127)
+          volume = 127;
+        noteOn(0x90 + channel, note, 127);
         noteOff(0x80 + channel, S_active[i]);
         S_active[i] = note;
 
@@ -378,15 +378,6 @@ void readControls(){
         delay(3);
       }
        S_vals[i] = stats.minimum(temp,3);
-        //Serial.println(S_vals[i]);
-       //if(abs(S_vals[i] - s_init[i]) < 5)
-         //S_vals[i] = 0;
-      //}
-//      else if(i == 0)
-//        S_vals[i] = analogRead(S_pins[i]);
-      //else
-        //S_vals[i] = 0;
-
     }
 
 }
