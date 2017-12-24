@@ -33,10 +33,10 @@
 #define T2        A0
 #define T3        A0
 
-#define JSX       A6
-#define JSY       A7
+#define JSX       A7
+#define JSY       A6
 
-#define JSSEL     7
+//#define JSSEL     7
 
 
 #define THRESH    600
@@ -82,6 +82,8 @@ bool volca = false;
 int volume_cc = VOLUME_CC;
 int mod_cc = MOD_CC;
 int channel = MIDI_CHANNEL;
+int pitch_bend = false;
+int prev_pitch_bend = 512;
 
 int modal_array [6][7] =  {{0,2,4,5,7,9,11},   //ionian
                            {0,2,3,5,7,9,10},   //dorian
@@ -146,8 +148,8 @@ void setup() {
     pinMode(S_pins[i], INPUT);
   }
   
-  //pinMode(JSX, INPUT);
-  //pinMode(JSY, INPUT);
+  pinMode(JSX, INPUT);
+  pinMode(JSY, INPUT);
   //pinMode(JSSEL, INPUT);
   //digitalWrite(JSSEL, HIGH);
 
@@ -177,15 +179,15 @@ void setup() {
 }
 
 void loop() {
+  readJoystick();
   readButtons();
   readModulationAndVol();
   readControls();
   determineFrets();
   legatoTest();
   pickNotes();
-  //readJoystick();
   cleanUp();
-  delay(5);
+  delay(1);
 }
 
 void readModulationAndVol(){
@@ -209,11 +211,11 @@ void readModulationAndVol(){
     onLED(modal+1,0,255,0);
     delay(500);
     onLED(N_PIXELS,0,0,0);
-    Serial.println(modal);
+    //Serial.println(modal);
   }
   
   if(abs(vol - pre_vol) > 1 && vol <= 127){
-    Serial.println("vol");
+    //Serial.println("vol");
     if (vol >= 127)
       vol = 127;
     if (vol <= 1)
@@ -227,7 +229,7 @@ void readModulationAndVol(){
       controllerChange(mod_cc,0);
     else if ( mod_final <= 127 )
       controllerChange(mod_cc,mod_final);
-       Serial.println("mod");
+       //Serial.println("mod");
     pre_mod = mod_final;    
   }
 }
@@ -253,20 +255,20 @@ void readButtons(){
         mod_cc = VOLCA_MOD_CC;
         channel = VOLCA_MIDI_CHANNEL;
         volca = true;
-        Serial.println("volca");
+        //Serial.println("volca");
       }
       else if (volca){
         volume_cc = VOLUME_CC;
         mod_cc = MOD_CC;
         channel = MIDI_CHANNEL;
         volca = false;
-        Serial.println("!volca");
+        //Serial.println("!volca");
       }         
     }
   
-    else if (!clear_notes){
-      controllerChange(MUTE_CC,0);
-    }
+//    else if (!clear_notes){
+//      controllerChange(MUTE_CC,0);
+//    }
 
     lastDebounceTime = millis();
   }
@@ -310,7 +312,7 @@ void legatoTest(){
       }
 
       if(note != S_active[i] && (fretTouched[i] || T_active[i])){
-        Serial.println("legatonote");
+        //Serial.println("legatonote");
         int volume = mod_final * 2;
         if(volume > 127)
           volume = 127;
@@ -423,10 +425,10 @@ void determineFrets () {
           }
 
         }          
-        Serial.println("fret");
-        Serial.println(i);
-        Serial.println(fretTouched[i]);
-        Serial.println("");
+//        Serial.println("fret");
+//        Serial.println(i);
+//        Serial.println(fretTouched[i]);
+//        Serial.println("");
        }
      }
    }
@@ -546,11 +548,11 @@ short checkTriggered(int i){
   if(!T_active[i] && v > THRESH){
     T_active[i] = true;
     ret = v;
-    Serial.println("triggered");
+    //Serial.println("triggered");
   }
   else if(T_active[i] && v < THRESH - T_PAD){
     T_active[i] = false;
-    Serial.println("un-triggered");
+    //Serial.println("un-triggered");
   }
   //Serial.println(ret);
   return ret;
@@ -561,62 +563,40 @@ void transpose(int dir){
     case 1:
       for (int i=0; i<N_STR; i++) {
         offsets[i] = offsets[i] + 1;
-        Serial.println(offsets[0]);
+        //Serial.println(offsets[0]);
       }
       break;
   
     case -1:
       for (int i=0; i<N_STR; i++) {
         offsets[i] = offsets[i] - 1;
-        Serial.println(offsets[0]);
+        //Serial.println(offsets[0]);
       }
       break;
    case 2:
       for (int i=0; i<N_STR; i++) {
         offsets[i] = offsets[i] + 12;
-        Serial.println(offsets[0]);
+        //Serial.println(offsets[0]);
       }
       break;
    case -2:
       for (int i=0; i<N_STR; i++) {
         offsets[i] = offsets[i] - 12;
-        Serial.println(offsets[0]);
+        //Serial.println(offsets[0]);
       }
       break;   
   }
 }
 
 void readJoystick(){
-   if (digitalRead(JSSEL) == LOW) {
-    //activate joystick
-    if (!btnState) {
-      //make sure modwheel value is set to 0 when stick is off
-      if (stickActive) controllerChange(1, 0);
-      stickActive = !stickActive;
-      Serial.println(stickActive);
-    }
-    btnState = true;
+  unsigned int joyx = analogRead(JSX);
+  if(abs(joyx - 512) > 10){
+    pitch_bend = true;
+	  PitchWheelChange(map(joyx,0, 1023, -8192, 8180));
   }
-  //reset once stick is no longer beingnote pressed
-  if (digitalRead(JSSEL) == HIGH && btnState) btnState = false;
-  
-  if (stickActive) {
-    //read positions from center
-    float xPos = map(analogRead(JSX), stickZeroX, 1023, 0, 127);
-    float yPos = map(analogRead(JSY), stickZeroY, 1023, 0, 127);
-    
-    //get absolute position from center
-    float z = sqrt(sq(xPos) + sq(yPos));
-    int stickVal = (int)constrain(z, 0, 127);
-    
-    if (stickVal > 0) {
-      stickState = true;
-      controllerChange(1, stickVal);
-    }
-    else if (stickState && stickVal == 0) {
-      stickState = false;
-      controllerChange(1, 0);
-    }
+  else if(pitch_bend){
+    PitchWheelChange(512);
+    pitch_bend = false;  
   }
 }
 
@@ -626,6 +606,7 @@ void noteOn(int cmd, int pitch, int velocity) {
   Serial.write(byte(cmd));
   Serial.write(byte(pitch));
   Serial.write(byte(velocity));
+  Serial.flush();
   digitalWrite(PIN_LED, HIGH);
 }
 //note-off message
@@ -634,17 +615,20 @@ void noteOff(int cmd, int pitch) {
   Serial.write(byte(cmd));
   Serial.write(byte(pitch));
   Serial.write(byte(0));
+  Serial.flush();
   digitalWrite(PIN_LED, LOW);
 }
 
 //Sends controller change to the specified controller
 void controllerChange(int controller, int value) {
-  Serial.println("cc");
+  //Serial.println("cc");
   int ch = 176 + channel;
   Serial.write(byte(ch));
   Serial.write(byte(controller));
   Serial.write(byte(value));
+  Serial.flush();
 }
+
 
 
 // Input a value 0 to 255 to get a color value.
@@ -660,5 +644,16 @@ uint32_t Wheel(byte WheelPos) {
   }
   WheelPos -= 170;
   return pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+void PitchWheelChange(int value) {
+    unsigned int change = 0x2000 + value;  //  0x2000 == No Change
+    unsigned char low = change & 0x7F;  // Low 7 bits
+    unsigned char high = (change >> 7) & 0x7F;  // High 7 bits
+
+    Serial.write(0xE0);
+    Serial.write(low);
+    Serial.write(high);
+    Serial.flush();
 }
 
