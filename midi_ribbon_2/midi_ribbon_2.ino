@@ -82,8 +82,10 @@ bool volca = false;
 int volume_cc = VOLUME_CC;
 int mod_cc = MOD_CC;
 int channel = MIDI_CHANNEL;
-int pitch_bend = false;
-int prev_pitch_bend = 512;
+bool isPitchBend = false;
+unsigned int pitchBendLight = 0;
+bool dim = false;
+
 
 int modal_array [6][7] =  {{0,2,4,5,7,9,11},   //ionian
                            {0,2,3,5,7,9,10},   //dorian
@@ -353,10 +355,9 @@ void legatoTest(){
         ledDebounceTime = millis(); 
         prev_led = led ;
     }
-  }
+ 
 
-  
-    
+  }
 }
 
 void cleanUp(){
@@ -590,13 +591,14 @@ void transpose(int dir){
 
 void readJoystick(){
   unsigned int joyx = analogRead(JSX);
-  if(abs(joyx - 512) > 10){
-    pitch_bend = true;
+  pitchBendLight = (abs(joyx - 512) / 10);
+  if(abs(joyx - 512) > 15){
+    isPitchBend = true;
 	  PitchWheelChange(map(joyx,0, 1023, -8192, 8180));
   }
-  else if(pitch_bend){
+  else if(isPitchBend){
     PitchWheelChange(512);
-    pitch_bend = false;  
+    isPitchBend = false;  
   }
 }
 
@@ -634,17 +636,22 @@ void controllerChange(int controller, int value) {
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
 uint32_t Wheel(byte WheelPos) {
-  WheelPos = 255 - WheelPos;
-  if(WheelPos < 85) {
-    return pixels.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  }
-  if(WheelPos < 170) {
-    WheelPos -= 85;
-    return pixels.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  }
-  WheelPos -= 170;
-  return pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+    WheelPos = 255 - WheelPos;
+    if(WheelPos < 85) {
+      return pixels.Color(255 - WheelPos * 3 + pitchBendLight, 0, WheelPos * 3 + pitchBendLight);
+    }
+    if(WheelPos < 170) {
+      WheelPos -= 85;
+      return pixels.Color(0, WheelPos * 3 + pitchBendLight , 255 - WheelPos * 3 + pitchBendLight);
+    }
+    else{
+      WheelPos -= 170;
+      return pixels.Color(WheelPos * 3 + pitchBendLight , 255 - WheelPos * 3 + pitchBendLight , 0 );
+    }
+    if(mod_final> 50){
+    }
 }
+
 
 void PitchWheelChange(int value) {
     unsigned int change = 0x2000 + value;  //  0x2000 == No Change
