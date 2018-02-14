@@ -4,6 +4,18 @@
 
 This project was inspired by Wintergatan's Modulin https://www.youtube.com/watch?v=MUdWeBYe3GY
 
+## Features
+
+* 2 x 24 quantized notes on a 50cm long neck
+* Able to switch between all 7 music modes while retaining quantization
+* +/- Semitone Tranpose and +/- Octave Tranpose
+* Finger pressure controls modulation
+* Volume controllable by adjusting the pot at the end of the neck
+* LED reacts to finger position
+* Pitchbend by using the analog stick
+
+[Demo](https://youtu.be/UU3WkZmNJEc)
+
 ## Main components
 
  
@@ -35,18 +47,19 @@ Note : The softpots are placed over the force sensitive resistors ( see picture 
 * Uncomment Serial.begin(115200) and comment Serial.begin(31250);
 * Uncomment calibrate() at line 168
 * To calibrate the softpots, open a serial console. When it says "waiting" press on one of the softstick and press the middle button on the midi shield. Repeat for N_FRET times and repeat the same for the second softpot. When it's done the program will write the calibration in to the EEPROM and you may comment the line 168 and switch the serial to 31250 baud again. 
+* The notes that are close to the Arduino are lower
 
-## Features
+## Manual
+* Semitone Transpose : Pressing one of black buttons on the midi shield will transpose up and the other black button will transpose down
+* Octave Transpose : Pressing the middle button AND one of the black button with do an octave transpose
+* Change musical mode : Turning the "lower" knob will change the music mode. When switching modes, the LEDs will light up according the mode you've chosen (1-7)
+* You need to twist the "upper" knob all the way up for it to work. This is a bug
+* Change volume : use the volume knob at the end of the stick
+* Pitch bend : Use the analog stick for pitchben
+* Modulation : Modulation is controlled by how hard you press on the stick, the harder you press the more modulation.
+* The midi out of the midi shield need to be plugged into your audio interface/midi converter
+* Power the Arduino either by pluggin the USB cable or through battery
 
-* 2 x 24 quantized notes on a 50cm long neck
-* Able to switch between all 7 music modes while retaining quantization
-* +/- Semitone Tranpose and +/- Octave Tranpose
-* Finger pressure controls modulation
-* Volume controllable by adjusting the pot at the end of the neck
-* LED reacts to finger position
-* Pitchbend by using the analog stick
-
-[Demo](https://youtu.be/UU3WkZmNJEc)
 
 
 
