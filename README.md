@@ -31,9 +31,12 @@ Theory by : https://synthhacker.blogspot.ca/2016/03/diy-midi-ribbon-controller.h
 Code adapted from https://github.com/deanm1278/arduinoRibbonController/blob/master/synth_v3.ino
 
 ## Schematics 
-![Schematics](/schematics_bb.png)
+![Schematics](/schematics.png)
+
+Note : In the prototyping board, all nodes in a black rectangle are connected together
 
 Note : The softpots are placed over the force sensitive resistors ( see picture below)
+
 
 ### Pins connection
 
